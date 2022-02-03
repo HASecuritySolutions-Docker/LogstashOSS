@@ -4,8 +4,7 @@ MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
 COPY logstash_plugins /logstash_plugins
 USER root
-RUN /usr/share/logstash/bin/logstash-plugin install logstash-filter-elasticsearch
-RUN /usr/share/logstash/bin/logstash-plugin install logstash-filter-tld
+RUN bash -c cat /logstash_plugins | while read line; do /usr/share/logstash/bin/logstash-plugin install $line; done
 USER logstash
 
 STOPSIGNAL SIGTERM
