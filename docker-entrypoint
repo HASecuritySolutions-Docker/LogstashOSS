@@ -6,7 +6,12 @@
 # host system.
 env2yaml /usr/share/logstash/config/logstash.yml
 
-cat /logstash_plugins | while read line; do /usr/share/logstash/bin/logstash-plugin install $line; done
+cat /logstash_plugins | while read line;
+do
+  if [ "$line" != "" ]; then
+    /usr/share/logstash/bin/logstash-plugin install --preserve $line;
+  fi
+done
 
 export LS_JAVA_OPTS="-Dls.cgroup.cpuacct.path.override=/ -Dls.cgroup.cpu.path.override=/ $LS_JAVA_OPTS"
 
