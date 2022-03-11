@@ -1,4 +1,4 @@
-FROM docker.elastic.co/logstash/logstash-oss:7.17.0
+FROM docker.elastic.co/logstash/logstash-oss:7.17.1
 
 MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
