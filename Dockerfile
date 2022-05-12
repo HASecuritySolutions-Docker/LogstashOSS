@@ -9,6 +9,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint \
     && chmod +r /usr/local/bin/docker-entrypoint
 USER logstash
 RUN /usr/share/logstash/bin/logstash-plugin install --preserve logstash-output-opensearch \
-    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-input-opensearch
+    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-input-opensearch \
+    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-filter-elasticsearch
 
 STOPSIGNAL SIGTERM
