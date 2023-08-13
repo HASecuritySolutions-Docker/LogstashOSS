@@ -1,4 +1,4 @@
-FROM docker.elastic.co/logstash/logstash-oss:8.8.1
+FROM docker.elastic.co/logstash/logstash-oss:8.9.0
 
 MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
@@ -19,6 +19,7 @@ RUN apt update \
 USER logstash
 RUN /usr/share/logstash/bin/logstash-plugin install --preserve logstash-output-opensearch \
     && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-input-opensearch \
-    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-filter-opensearch
+    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-filter-opensearch \
+    && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-output-syslog
 
 STOPSIGNAL SIGTERM
