@@ -2,6 +2,7 @@ FROM docker.elastic.co/logstash/logstash-oss:8.18.2
 
 MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
+LABEL version="8.18.2"
 COPY logstash_plugins /logstash_plugins
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 USER root
