@@ -26,6 +26,23 @@ jobs:
       # Get the repository's code
       - name: Checkout
         uses: actions/checkout@v2
+        
+      - name: Extract version from Dockerfile
+        id: vars
+        run: |
+          VERSION=$(grep -E '^LABEL +version *= *"[^"]+"' Dockerfile | sed -E 's/.*version *= *"([^"]+)"/\1/')
+          echo "VERSION=$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Docker meta
+        id: prep
+        uses: docker/metadata-action@v3
+        with:
+          images: hasecuritysolutions/logstash-oss
+          tags: |
+            latest
+            ${{ steps.vars.outputs.version }}
+
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -39,22 +56,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Docker meta
-        id: prep # you'll use this in the next step
-        uses: docker/metadata-action@v3
-        with:
-          # list of Docker images to use as base name for tags
-          images: |
-            hasecuritysolutions/logstash-oss
-          # Docker tags based on the following events/attributes
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
+      
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
