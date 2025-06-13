@@ -4,12 +4,14 @@ name: Build
 on:
   push:
     branches:
+      - 'master'
       - 'main'
       - 'dev'
     tags:
       - '*'
   pull_request:
     branches:
+      - 'master'
       - 'main'
       - 'dev'
 
