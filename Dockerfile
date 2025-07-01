@@ -1,8 +1,8 @@
-FROM docker.elastic.co/logstash/logstash-oss:8.18.2
+FROM docker.elastic.co/logstash/logstash-oss:8.15.5
 
 MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
-LABEL version="8.18.2"
+LABEL version="8.15.5-sentinel"
 COPY logstash_plugins /logstash_plugins
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 USER root
@@ -17,6 +17,8 @@ RUN apt update \
     #&& echo 'export PATH=$PATH:$LS_JAVA_HOME/bin '|tee -a ~/.bashrc \
     && chmod +x /usr/local/bin/docker-entrypoint \
     && chmod +r /usr/local/bin/docker-entrypoint
+#https://learn.microsoft.com/en-us/azure/sentinel/connect-logstash-data-connection-rules#known-issues
+RUN apt install netbase -y
 USER logstash
 RUN /usr/share/logstash/bin/logstash-plugin install --preserve logstash-output-opensearch \
     && /usr/share/logstash/bin/logstash-plugin install --preserve logstash-input-opensearch \
