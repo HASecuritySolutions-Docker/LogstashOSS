@@ -1,8 +1,8 @@
-FROM docker.elastic.co/logstash/logstash-oss:8.15.5
+FROM docker.elastic.co/logstash/logstash-oss:8.19.20
 
 MAINTAINER Justin Henderson justin@hasecuritysolutions.com
 
-LABEL version="8.15.5-sentinel"
+LABEL version="8.19.20"
 COPY logstash_plugins /logstash_plugins
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 USER root
