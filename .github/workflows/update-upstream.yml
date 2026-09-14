@@ -1,0 +1,143 @@
+name: Update upstream Logstash
+
+# Tracks docker.elastic.co/logstash/logstash-oss and opens a PR whenever a
+# newer release appears within the pinned major line (8.x by default).
+# Only stable releases are considered; SNAPSHOT tags are ignored.
+on:
+  schedule:
+    - cron: '17 6 * * *'   # daily, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      major:
+        description: 'Major version line to track'
+        required: false
+        default: '8'
+      version:
+        description: 'Pin to an exact version instead of resolving the latest (optional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-upstream
+  cancel-in-progress: false
+
+env:
+  MAJOR: ${{ github.event.inputs.major || '8' }}
+  VERSION_OVERRIDE: ${{ github.event.inputs.version }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.bump.outputs.changed }}
+      current: ${{ steps.bump.outputs.current }}
+      target: ${{ steps.bump.outputs.target }}
+      line: ${{ steps.bump.outputs.line }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve newest upstream release
+        id: upstream
+        run: |
+          if [ -n "$VERSION_OVERRIDE" ]; then
+            VERSION="$VERSION_OVERRIDE"
+          else
+            VERSION="$(.github/scripts/latest-upstream-tag.sh "$MAJOR")"
+          fi
+          echo "Newest upstream ${MAJOR}.x image: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with Dockerfile
+        id: bump
+        env:
+          TARGET: ${{ steps.upstream.outputs.version }}
+        run: |
+          OUT="$(.github/scripts/bump-upstream.sh "$TARGET")"
+          echo "$OUT"
+          for kv in $OUT; do echo "$kv" >> "$GITHUB_OUTPUT"; done
+          echo "line=${TARGET%.*}" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          {
+            echo "| | version |"
+            echo "|---|---|"
+            echo "| Dockerfile | ${{ steps.bump.outputs.current }} |"
+            echo "| Upstream ${MAJOR}.x | ${{ steps.bump.outputs.target }} |"
+            echo
+            if [ "${{ steps.bump.outputs.changed }}" = "true" ]; then
+              echo "Update available; building and opening a PR."
+            else
+              echo "Already current; nothing to do."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  update:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CURRENT: ${{ needs.check.outputs.current }}
+      TARGET: ${{ needs.check.outputs.target }}
+      LINE: ${{ needs.check.outputs.line }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply bump
+        run: .github/scripts/bump-upstream.sh "$TARGET"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Prove the new base image builds with our plugin set before proposing it.
+      # The PR opened below is created by a token, so the regular Build workflow
+      # will not run on it unless UPSTREAM_BUMP_TOKEN is a PAT (see README).
+      - name: Test build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: logstash-oss:test
+
+      - name: Smoke test
+        run: |
+          docker run --rm logstash-oss:test /usr/share/logstash/bin/logstash-plugin list --verbose \
+            | tee plugins.txt
+          for p in logstash-output-opensearch logstash-input-opensearch logstash-filter-opensearch logstash-output-syslog; do
+            grep -q "^$p " plugins.txt || { echo "::error::$p missing from image"; exit 1; }
+          done
+          timeout 300 docker run --rm logstash-oss:test \
+            logstash --log.level=error \
+              -e 'input { generator { count => 1 } } output { stdout { codec => json_lines } }' \
+            | tee pipeline.txt
+          grep -q '"sequence":0' pipeline.txt || { echo "::error::generator pipeline produced no event"; exit 1; }
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.UPSTREAM_BUMP_TOKEN || secrets.GITHUB_TOKEN }}
+          branch: auto/logstash-upstream-bump
+          delete-branch: true
+          commit-message: Bump Logstash to ${{ env.TARGET }}
+          title: Bump Logstash to ${{ env.TARGET }}
+          body: |
+            Upstream `docker.elastic.co/logstash/logstash-oss` has a newer ${{ env.MAJOR }}.x release.
+
+            | | version |
+            |---|---|
+            | Current | `${{ env.CURRENT }}` |
+            | New | `${{ env.TARGET }}` |
+
+            Release notes: https://github.com/elastic/logstash/releases/tag/v${{ env.TARGET }}
+            (${{ env.LINE }} series: https://www.elastic.co/guide/en/logstash/${{ env.LINE }}/releasenotes.html)
+
+            The image was built for linux/amd64 with the pinned plugin set and passed a
+            plugin-list and generator-pipeline smoke test in this workflow run.
