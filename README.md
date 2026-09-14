@@ -26,3 +26,21 @@ Setup notes:
 
 - In **Settings > Actions > General**, enable *Allow GitHub Actions to create and approve pull requests*. Despite the name, this only lets the bot open the PR; the workflow never approves or merges anything. A person reviews and merges each bump.
 - Pull requests opened with the built-in `GITHUB_TOKEN` do not trigger other workflows, so the `Build` workflow will not run on the bot's PR. The update workflow performs its own test build to compensate. If you want the regular `Build` checks on the PR as well, add a repository secret named `UPSTREAM_BUMP_TOKEN` containing a personal access token with `contents` and `pull-requests` write access; the workflow uses it automatically when present.
+
+### Testing locally
+
+The workflow can be run end to end on a workstation with [nektos/act](https://github.com/nektos/act), so changes to it do not need to be pushed to find out whether they work. The pull request step is skipped automatically under act.
+
+1. Docker must be reachable from the shell (on Windows: Docker Desktop running, with WSL integration enabled for your distro under Settings > Resources > WSL integration).
+2. Install act once: `gh extension install nektos/gh-act`. The `.actrc` in the repo selects a runner image that matches `ubuntu-latest` closely enough.
+3. Dry run: `gh act workflow_dispatch -W .github/workflows/update-upstream.yml`. Add `--input version=8.19.21` (any real version) to force a bump when the Dockerfile is already current.
+
+Without act, the same pieces can be run by hand:
+
+```
+bash .github/scripts/latest-upstream-tag.sh 8        # newest 8.x with a published image
+bash .github/scripts/bump-upstream.sh <version>      # rewrites FROM and LABEL version
+docker build -t logstash-oss:test .
+bash .github/scripts/smoke-test.sh logstash-oss:test
+git checkout Dockerfile                              # undo the bump when done
+```
