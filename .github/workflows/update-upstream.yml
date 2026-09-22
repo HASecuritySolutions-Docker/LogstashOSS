@@ -39,7 +39,7 @@ jobs:
       line: ${{ steps.bump.outputs.line }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve newest upstream release
         id: upstream
@@ -47,7 +47,7 @@ jobs:
           if [ -n "$VERSION_OVERRIDE" ]; then
             VERSION="$VERSION_OVERRIDE"
           else
-            VERSION="$(.github/scripts/latest-upstream-tag.sh "$MAJOR")"
+            VERSION="$(bash .github/scripts/latest-upstream-tag.sh "$MAJOR")"
           fi
           echo "Newest upstream ${MAJOR}.x image: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -57,7 +57,7 @@ jobs:
         env:
           TARGET: ${{ steps.upstream.outputs.version }}
         run: |
-          OUT="$(.github/scripts/bump-upstream.sh "$TARGET")"
+          OUT="$(bash .github/scripts/bump-upstream.sh "$TARGET")"
           echo "$OUT"
           for kv in $OUT; do echo "$kv" >> "$GITHUB_OUTPUT"; done
           echo "line=${TARGET%.*}" >> "$GITHUB_OUTPUT"
@@ -87,10 +87,10 @@ jobs:
       LINE: ${{ needs.check.outputs.line }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Apply bump
-        run: .github/scripts/bump-upstream.sh "$TARGET"
+        run: bash .github/scripts/bump-upstream.sh "$TARGET"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -108,19 +108,10 @@ jobs:
           tags: logstash-oss:test
 
       - name: Smoke test
-        run: |
-          docker run --rm logstash-oss:test /usr/share/logstash/bin/logstash-plugin list --verbose \
-            | tee plugins.txt
-          for p in logstash-output-opensearch logstash-input-opensearch logstash-filter-opensearch logstash-output-syslog; do
-            grep -q "^$p " plugins.txt || { echo "::error::$p missing from image"; exit 1; }
-          done
-          timeout 300 docker run --rm logstash-oss:test \
-            logstash --log.level=error \
-              -e 'input { generator { count => 1 } } output { stdout { codec => json_lines } }' \
-            | tee pipeline.txt
-          grep -q '"sequence":0' pipeline.txt || { echo "::error::generator pipeline produced no event"; exit 1; }
+        run: bash .github/scripts/smoke-test.sh logstash-oss:test
 
       - name: Open pull request
+        if: ${{ !env.ACT }}   # skipped under nektos/act (local testing)
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.UPSTREAM_BUMP_TOKEN || secrets.GITHUB_TOKEN }}
