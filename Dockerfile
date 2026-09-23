@@ -1,7 +1,7 @@
-FROM docker.elastic.co/logstash/logstash-oss:8.19.20
+FROM docker.elastic.co/logstash/logstash-oss:8.19.22
 
 LABEL maintainer="Justin Henderson justin@hasecuritysolutions.com"
-LABEL version="8.19.20"
+LABEL version="8.19.22"
 
 COPY logstash_plugins /logstash_plugins
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
